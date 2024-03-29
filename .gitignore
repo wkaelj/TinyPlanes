@@ -1,0 +1,15 @@
+# c build files
+build/
+*.o
+*.out
+compile_commands.json
+
+#clangd
+.cache
+
+# texture gimp files
+*.xcf
+
+# valgrind
+vgcore.*
+
