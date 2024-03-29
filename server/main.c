@@ -1,5 +1,6 @@
 #include "packets.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -7,11 +8,18 @@
 
 #include <sys/queue.h>
 
+// generate a uid for new clients
+uid_t gen_uid(void)
+{
+    static uid_t id = 99;
+    return id++;
+}
+
 struct Connection
 {
     uid_t id;
     struct sockaddr client_addr;
-    void *plane_data; // TODO
+    socklen_t client_addr_len;
 
     LIST_ENTRY(Connection) data;
 };
@@ -56,19 +64,79 @@ int main()
             log_warning("Error recieving packet");
             continue;
         }
+        struct Connection *c; // store the connection node when relevant
         switch (p.type)
         {
-        case PACKET_TYPE_EMPTY: break;
+        case PACKET_TYPE_EMPTY:
+            // send same packet back
+            sendto(
+                server_socket,
+                &p,
+                sizeof(p),
+                0,
+                &client_addr,
+                client_addr_size);
+            break;
         case PACKET_TYPE_CONNECITON:
             // send back uid
+            {
+                struct ConnectionPacket cpack = {
+                    .return_uid = gen_uid(),
+                    .type       = PACKET_TYPE_CONNECITON,
+                };
+                sendto(
+                    server_socket,
+                    &cpack,
+                    sizeof(cpack),
+                    0,
+                    &client_addr,
+                    client_addr_size);
+                // add node
+                struct Connection *new_node = malloc(sizeof(struct Connection));
+                *new_node                   = (struct Connection){
+                                      .client_addr     = client_addr,
+                                      .client_addr_len = client_addr_size,
+                                      .id              = cpack.return_uid,
+                };
+                LIST_INSERT_HEAD(&connection_list, new_node, data);
+            }
             break;
         case PACKET_TYPE_DISCONNECTION:
             // send disconnect and id to all clients
-        case PACKET_TYPE_DATA:
+            // and delete the node when encountered
+            LIST_FOREACH(c, &connection_list, data)
+            {
+                if (c->id != p.disconnect_packet.id)
+                {
+                    // resend incoming packet to all connected, and remove them
+                    sendto(
+                        server_socket,
+                        &p,
+                        sizeof(p),
+                        0,
+                        &c->client_addr,
+                        c->client_addr_len);
+                }
+                else
+                {
+                    LIST_REMOVE(c, data);
+                }
+            }
+
+        case PACKET_TYPE_PLANE:
             // update all clients with plane info
+            LIST_FOREACH(c, &connection_list, data)
+            {
+                if (sendto(
+                        server_socket,
+                        &p,
+                        sizeof(p),
+                        0,
+                        &c->client_addr,
+                        c->client_addr_len) == -1)
+                    log_error("Local error sending plane packet");
+            }
             break;
         }
     }
-    // listen for plane updates
-    // send to all connected
 }

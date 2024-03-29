@@ -8,7 +8,7 @@ typedef enum PacketType
     PACKET_TYPE_EMPTY = 0,
     PACKET_TYPE_CONNECITON,
     PACKET_TYPE_DISCONNECTION,
-    PACKET_TYPE_DATA,
+    PACKET_TYPE_PLANE,
 } PacketType;
 
 typedef union Packet
@@ -34,5 +34,6 @@ typedef union Packet
         PacketType type;
         uid_t id;
         SimplePlane plane;
+        time_t update_time;
     } data_packet;
 } Packet;
