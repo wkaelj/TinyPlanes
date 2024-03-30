@@ -11,6 +11,9 @@
 #include <messenger.h>
 #include <unistd.h>
 
+#include <utils.h>
+
+// busted macro should never have been done
 #define SKY_COLOUR 180, 190, 230, 255
 static inline f64 get_delta(size_t fps_limit);
 void render_debug_text(const Render *r, const RenderFont *font, const char *t);
@@ -278,20 +281,6 @@ void render_debug_text(const Render *r, const RenderFont *font, const char *t)
     };
     render_draw_text(r, text, &text_rect);
     render_destroy_text(text);
-}
-
-const unsigned int SEC_TO_MICROSEC = 1000000;
-
-time_t get_time(void)
-{
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    // they must be combined to prevent huge lag at microsecond wrap
-    // every second, which would result in the calculation of time
-    // difference in the get_delta function to be a negative number.
-    // when said negative was subtracted from frametime it would a
-    // very large number and cause a long wait
-    return t.tv_usec + t.tv_sec * SEC_TO_MICROSEC;
 }
 
 static inline f64 get_delta(size_t limit)

@@ -54,7 +54,7 @@ client.out: $(CLIENT_OBJ) $(SHARED_OBJ)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 server.out: $(SERVER_OBJ) $(SHARED_OBJ)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ -lm -fanitize=address
 
 $(BUILD)/%.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $@

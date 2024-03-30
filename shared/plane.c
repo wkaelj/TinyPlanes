@@ -4,12 +4,11 @@
 #include <math.h>
 #include <string.h>
 #include <sys/time.h>
+#include "utils.h"
 
 #define BULLET_DRAG 20
 #define BULLET_INITIAL_SPEED 800
 #define BULLET_MINIMUM_SPEED 400
-
-extern time_t get_time(void);
 
 Plane create_plane(
     int plane_type,

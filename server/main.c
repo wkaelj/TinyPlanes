@@ -1,5 +1,5 @@
 #include "packets.h"
-#include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -25,12 +25,25 @@ struct Connection
 };
 
 const short SERVER_PORT = 8080;
+const short MAX_CLIENTS = 256;
+
+int main();
+
+void crash_handler(int)
+{
+    // NOTE: this function causes massive memory leaks
+    log_error("Auto restarting server after crash");
+    main();
+}
 
 int main()
 {
+    signal(SIGSEGV, crash_handler);
     // list of connected clients
     LIST_HEAD(ConnectionList, Connection) connection_list;
     LIST_INIT(&connection_list);
+
+    size_t client_count = 0;
 
     // start listening for connections
     struct sockaddr_in server_addr = {
@@ -39,6 +52,7 @@ int main()
         .sin_addr.s_addr = inet_addr("127.0.0.1"),
     };
     int server_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    // TODO error check
     if (bind(
             server_socket,
             (struct sockaddr *)&server_addr,
@@ -59,7 +73,7 @@ int main()
                 sizeof(p),
                 0,
                 &client_addr,
-                &client_addr_size) > 0)
+                &client_addr_size) < 0)
         {
             log_warning("Error recieving packet");
             continue;
@@ -78,6 +92,12 @@ int main()
                 client_addr_size);
             break;
         case PACKET_TYPE_CONNECITON:
+            if (client_count >= MAX_CLIENTS)
+            {
+                log_warning("Connection denied, too many players");
+                break;
+            }
+            log_info("New connection");
             // send back uid
             {
                 struct ConnectionPacket cpack = {
@@ -99,11 +119,14 @@ int main()
                                       .id              = cpack.return_uid,
                 };
                 LIST_INSERT_HEAD(&connection_list, new_node, data);
+                client_count++;
             }
             break;
         case PACKET_TYPE_DISCONNECTION:
+            log_info("A client has disconnected");
             // send disconnect and id to all clients
             // and delete the node when encountered
+            struct Connection *removed;
             LIST_FOREACH(c, &connection_list, data)
             {
                 if (c->id != p.disconnect_packet.id)
@@ -119,10 +142,13 @@ int main()
                 }
                 else
                 {
-                    LIST_REMOVE(c, data);
+                    removed = c; // set so it can be removed after loop
                 }
             }
-
+            LIST_REMOVE(removed, data);
+            free(removed);
+            client_count--;
+            break;
         case PACKET_TYPE_PLANE:
             // update all clients with plane info
             LIST_FOREACH(c, &connection_list, data)
