@@ -129,6 +129,9 @@ int main()
             struct Connection *removed;
             LIST_FOREACH(c, &connection_list, data)
             {
+
+                // TODO: change so that is sends the disconnect to the client
+                // leaving
                 if (c->id != p.disconnect_packet.id)
                 {
                     // resend incoming packet to all connected, and remove them

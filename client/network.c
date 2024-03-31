@@ -3,6 +3,7 @@
 #include <asm-generic/errno.h>
 #include <assert.h>
 #include <errno.h>
+#include <string.h>
 #include <unistd.h>
 #include <messenger.h>
 #include <utils.h>
@@ -10,6 +11,13 @@
 uid_t create_connection(Connection *c, const char *ip)
 {
     int client_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+    // prevent long waits for packets
+    struct timeval tv = {
+        .tv_sec  = 0,
+        .tv_usec = 500000,
+    };
+    setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     struct sockaddr_in server_addr = {
         .sin_family      = AF_INET,
@@ -89,6 +97,8 @@ Result connection_send_client_plane(
         .update_time = get_time(),
         .plane       = *p,
     };
+
+    assert(memcmp(&packet.plane, p, sizeof(SimplePlane)) == 0);
 
     if (sendto(
             c->client_socket,

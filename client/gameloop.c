@@ -55,7 +55,6 @@ int game_update(GameData *game, f32 delta)
 
     draw_terrain(&game->plane_render, &client_plane);
 
-    draw_plane(&game->plane_render, &client_plane, &client_plane);
     // draw planes
     struct PlaneNode *plane;
     LIST_FOREACH(plane, &game->multiplayer.plane_list, data)
@@ -119,15 +118,16 @@ Result game_loop()
                     game.render, game.main_menu_buttons.connect))
             {
                 // get text input for server ip
-                char *txt = input_get_input_text(game.render);
-                assert(array_length(game.multiplayer.server_ip) == 16);
+                const char *txt = input_get_input_text(game.render);
+                assert(array_length(game.multiplayer.server_ip) == 10);
                 strncpy(
                     game.multiplayer.server_ip,
                     txt,
                     array_length(game.multiplayer.server_ip));
 
-                log_info("Switching to game state CONNECTING");
-                log_info("Input IP %s", game.multiplayer.server_ip);
+                log_info(
+                    "Switching to game state CONNECTING\n, Input IP %s",
+                    game.multiplayer.server_ip);
 
                 input_stop_text_input(game.render);
                 game.game_state = GAME_STATE_CONNECTING;
@@ -140,11 +140,10 @@ Result game_loop()
             render_clear(game.render);
             // attempt to connect to server ip
             // change state, or if failed retry set # of times
-            for (size_t i = 0; i < 16; i++)
+            for (size_t i = 0; i < 1; i++)
             {
                 uid_t id = create_connection(
                     &game.multiplayer.connection, game.multiplayer.server_ip);
-                log_debug("Assigned id == %u", id);
                 if (id == 0)
                 {
                     log_warning(
@@ -155,6 +154,7 @@ Result game_loop()
                 {
                     game.multiplayer.id = id;
                     game.game_state     = GAME_STATE_IN_FLIGHT; // go to game
+                    log_info("Connected to server, starting flight");
                     goto exit_connect; // exit switch statement (break only
                                        // leave for)
                 }
@@ -179,6 +179,12 @@ Result game_loop()
             exit(1);
             break;
         }
+    }
+
+    // disconnect from server if connected
+    if (game.multiplayer.id != 0)
+    {
+        close_connection(&game.multiplayer.connection, game.multiplayer.id);
     }
 
     destroy_game(&game);
@@ -253,24 +259,33 @@ Result init_game(GameData *g)
     return RS_SUCCESS;
 }
 
-void destroy_game(GameData *g)
+void destroy_game(GameData *game)
 {
-    destroy_plane_render(&g->plane_render);
+    // free plane list, as planes connected when client disconnects could leak
+    struct PlaneNode *node;
+    while (LIST_EMPTY(&game->multiplayer.plane_list) == false)
+    {
+        node = LIST_FIRST(&game->multiplayer.plane_list);
+        LIST_REMOVE(node, data);
+        free(node);
+    }
+
+    destroy_plane_render(&game->plane_render);
     // destroy menu buttons
-    if (g->main_menu_buttons.connect != NULL)
-        render_destroy_button(g->main_menu_buttons.connect);
-    if (g->main_menu_buttons.exit != NULL)
-        render_destroy_button(g->main_menu_buttons.exit);
+    if (game->main_menu_buttons.connect != NULL)
+        render_destroy_button(game->main_menu_buttons.connect);
+    if (game->main_menu_buttons.exit != NULL)
+        render_destroy_button(game->main_menu_buttons.exit);
 
     // unload fonts and textures
-    if (g->fonts.menu != NULL)
-        render_destroy_font(g->fonts.menu);
+    if (game->fonts.menu != NULL)
+        render_destroy_font(game->fonts.menu);
     // NOTE: should be removed, just because currently fonts are the same
-    g->fonts.hud = NULL;
-    if (g->fonts.hud != NULL)
-        render_destroy_font(g->fonts.hud);
-    render_destroy_render(g->render);
-    render_destroy_window(g->window);
+    game->fonts.hud = NULL;
+    if (game->fonts.hud != NULL)
+        render_destroy_font(game->fonts.hud);
+    render_destroy_render(game->render);
+    render_destroy_window(game->window);
     render_quit();
 }
 
@@ -317,14 +332,17 @@ update_server_planes(const Connection *connection, struct PlaneList *plane_list)
         switch (update.type)
         {
         case CONNECTION_UPDATE_PLANE:
-            // find the plane updated and assign new data
+            // find the plane updated and assign data if it is newer
             LIST_FOREACH(node, plane_list, data)
             {
                 if (node->player_id == update.plane_update.id)
                 {
-                    node->p            = update.plane_update.plane;
-                    node->last_updated = update.plane_update.update_time;
-                    break;
+                    if (node->last_updated < update.plane_update.update_time)
+                    {
+                        node->p            = update.plane_update.plane;
+                        node->last_updated = update.plane_update.update_time;
+                    }
+                    goto exit_update;
                 }
             }
             // assume that the plane is new, hence not in the list, and add it
@@ -333,6 +351,7 @@ update_server_planes(const Connection *connection, struct PlaneList *plane_list)
             node->last_updated = update.plane_update.update_time;
             node->p            = update.plane_update.plane;
             LIST_INSERT_HEAD(plane_list, node, data);
+        exit_update:
             break;
         case CONNECTION_UPDATE_DISCONNECT:
             // find plane that is disconencting and remove it from the draw list
