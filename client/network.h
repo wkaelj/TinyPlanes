@@ -43,6 +43,7 @@ typedef union ConnectionUpdate
     {
         ConnectionUpdateType type;
         uid_t id;
+        time_t update_time;
         SimplePlane plane;
     } plane_update;
 } ConnectionUpdate;

@@ -1,3 +1,4 @@
+#include "network.h"
 #include "plane_render.h"
 #include "render/render.h"
 #include "types.h"
@@ -48,7 +49,7 @@ typedef struct GameData
     struct
     {
         char server_ip[16];
-        int server_socket;
+        Connection connection;
         uid_t id; // this client's id, recieved from server
         size_t player_count;
         LIST_HEAD(PlaneList, PlaneNode) plane_list;

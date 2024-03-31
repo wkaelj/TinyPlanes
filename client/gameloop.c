@@ -28,7 +28,8 @@ Result update_client_plane(GameData *g, f32 delta);
 
 // moves all the planes in the list received from the server
 // so that they do not stutter as much.
-Result update_server_planes();
+Result update_server_planes(
+    const Connection *connection, struct PlaneList *plane_list);
 
 // attempts to retrieve the entity list from the server
 // if it cannot it just leaves the planes at their predicted positions
@@ -36,21 +37,21 @@ Result retrieve_server_planes();
 
 int game_update(GameData *game, f32 delta)
 {
-    // predictively move stored planes
+    SimplePlane client_plane = create_simple_plane(&game->client_plane);
 
     // read input and move client plane
     update_client_plane(game, delta);
 
     // inform server of movement
+    connection_send_client_plane(
+        &game->multiplayer.connection, game->multiplayer.id, &client_plane);
 
-    // try to get server airplanes
-    // if success update plane positions
+    update_server_planes(
+        &game->multiplayer.connection, &game->multiplayer.plane_list);
 
     // draw
     render_set_colour(game->render, SKY_COLOUR);
     render_clear(game->render);
-
-    SimplePlane client_plane = create_simple_plane(&game->client_plane);
 
     draw_terrain(&game->plane_render, &client_plane);
 
@@ -64,7 +65,6 @@ int game_update(GameData *game, f32 delta)
         if (plane->player_id == game->multiplayer.id)
             plane->p = create_simple_plane(&game->client_plane);
 
-        // should implicitly draw client plane due to server behavior
         draw_plane(&game->plane_render, &client_plane, &plane->p);
 
         // while drawing check for bullet interceptions
@@ -118,18 +118,53 @@ Result game_loop()
             if (render_button_clicked(
                     game.render, game.main_menu_buttons.connect))
             {
+                // get text input for server ip
+                char *txt = input_get_input_text(game.render);
+                assert(array_length(game.multiplayer.server_ip) == 16);
+                strncpy(
+                    game.multiplayer.server_ip,
+                    txt,
+                    array_length(game.multiplayer.server_ip));
+
                 log_info("Switching to game state CONNECTING");
-                log_info("Input IP %s", input_get_input_text(game.render));
+                log_info("Input IP %s", game.multiplayer.server_ip);
+
                 input_stop_text_input(game.render);
-                game.game_state = GAME_STATE_IN_FLIGHT;
+                game.game_state = GAME_STATE_CONNECTING;
 
                 render_clear(game.render); // no leftover menu items
             }
             break;
         case GAME_STATE_CONNECTING:
             // draw connecting animation
+            render_clear(game.render);
             // attempt to connect to server ip
             // change state, or if failed retry set # of times
+            for (size_t i = 0; i < 16; i++)
+            {
+                uid_t id = create_connection(
+                    &game.multiplayer.connection, game.multiplayer.server_ip);
+                log_debug("Assigned id == %u", id);
+                if (id == 0)
+                {
+                    log_warning(
+                        "Error connecting to server, attempt %zu", i + 1);
+                    continue;
+                }
+                else
+                {
+                    game.multiplayer.id = id;
+                    game.game_state     = GAME_STATE_IN_FLIGHT; // go to game
+                    goto exit_connect; // exit switch statement (break only
+                                       // leave for)
+                }
+            }
+            // if id still 0
+            log_error("Failed to connect to server");
+            game.game_state =
+                GAME_STATE_MAIN_MENU; // return to the main menu on failure
+            input_start_text_input(game.render);
+        exit_connect:
             break;
         case GAME_STATE_IN_FLIGHT: game_update(&game, delta); break;
         case GAME_STATE_DIED:
@@ -268,6 +303,59 @@ Result update_client_plane(GameData *game, f32 delta)
         game->client_plane.throttle = 1.f;
     if (game->client_plane.throttle < 0.f)
         game->client_plane.throttle = 0.f;
+
+    return RS_SUCCESS;
+}
+
+Result
+update_server_planes(const Connection *connection, struct PlaneList *plane_list)
+{
+    ConnectionUpdate update = connection_pump_updates(connection);
+    struct PlaneNode *node;
+    while (update.type != CONNECTION_NO_UPDATE)
+    {
+        switch (update.type)
+        {
+        case CONNECTION_UPDATE_PLANE:
+            // find the plane updated and assign new data
+            LIST_FOREACH(node, plane_list, data)
+            {
+                if (node->player_id == update.plane_update.id)
+                {
+                    node->p            = update.plane_update.plane;
+                    node->last_updated = update.plane_update.update_time;
+                    break;
+                }
+            }
+            // assume that the plane is new, hence not in the list, and add it
+            node               = malloc(sizeof(struct PlaneNode));
+            node->player_id    = update.plane_update.id;
+            node->last_updated = update.plane_update.update_time;
+            node->p            = update.plane_update.plane;
+            LIST_INSERT_HEAD(plane_list, node, data);
+            break;
+        case CONNECTION_UPDATE_DISCONNECT:
+            // find plane that is disconencting and remove it from the draw list
+            LIST_FOREACH(node, plane_list, data)
+            {
+                // check if id matches, remove node, stop checking
+                if (node->player_id == update.disconnect_update.id)
+                {
+                    log_info(
+                        "Disconnecting plane, id %i",
+                        update.disconnect_update.id);
+                    LIST_REMOVE(node, data);
+                    free(node);
+                    break; // NOTE: will this break out of the upper while loop?
+                }
+            }
+        case CONNECTION_UPDATE_ERROR: log_info("Sad"); break;
+        default: log_warning("Unexpected connection update type"); break;
+        }
+        update = connection_pump_updates(connection);
+    }
+
+    return RS_SUCCESS;
 }
 
 void render_debug_text(const Render *r, const RenderFont *font, const char *t)

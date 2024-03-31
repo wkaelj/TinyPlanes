@@ -145,9 +145,10 @@ ConnectionUpdate connection_pump_updates(const Connection *c)
         return update;
     case PACKET_TYPE_PLANE:
         // fill out and return plane update
-        update.plane_update.type  = CONNECTION_UPDATE_PLANE;
-        update.plane_update.id    = inc_packet.data_packet.id;
-        update.plane_update.plane = inc_packet.data_packet.plane;
+        update.plane_update.type        = CONNECTION_UPDATE_PLANE;
+        update.plane_update.id          = inc_packet.data_packet.id;
+        update.plane_update.plane       = inc_packet.data_packet.plane;
+        update.plane_update.update_time = inc_packet.data_packet.update_time;
         return update;
     default:
         log_error("Invalid packet type");
