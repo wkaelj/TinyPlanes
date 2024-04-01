@@ -45,10 +45,7 @@ uid_t create_connection(Connection *c, const char *ip)
     }
 
     // recieve response, should contain a uid
-    struct sockaddr addr;
-    socklen_t addr_len;
-    if (recvfrom(client_socket, &packet, sizeof(packet), 0, &addr, &addr_len) ==
-        -1)
+    if (recvfrom(client_socket, &packet, sizeof(packet), 0, NULL, NULL) == -1)
     {
         log_error("Failed to recieve consfirmation of connection");
         close(client_socket);
