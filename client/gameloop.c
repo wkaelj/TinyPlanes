@@ -119,7 +119,7 @@ Result game_loop()
             {
                 // get text input for server ip
                 const char *txt = input_get_input_text(game.render);
-                assert(array_length(game.multiplayer.server_ip) == 10);
+                assert(array_length(game.multiplayer.server_ip) == 16);
                 strncpy(
                     game.multiplayer.server_ip,
                     txt,

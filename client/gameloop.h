@@ -48,7 +48,7 @@ typedef struct GameData
 
     struct
     {
-        char server_ip[10];
+        char server_ip[16];
         Connection connection;
         uid_t id; // this client's id, recieved from server
         size_t player_count;
