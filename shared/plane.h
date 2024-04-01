@@ -7,7 +7,7 @@
 // to be created with various features, such as turn rate, top speed,
 // min speed, and weapons
 
-#define MAX_BULLET_COUNT 512
+#define MAX_BULLET_COUNT 128
 
 typedef enum Direction
 {

@@ -39,6 +39,13 @@ int game_update(GameData *game, f32 delta)
 {
     SimplePlane client_plane = create_simple_plane(&game->client_plane);
 
+    // make sure bullet lists match
+    assert(
+        memcmp(
+            client_plane.active_bullets,
+            &game->client_plane.active_bullets,
+            sizeof(client_plane.active_bullets)) == 0);
+
     // read input and move client plane
     update_client_plane(game, delta);
 
@@ -62,18 +69,44 @@ int game_update(GameData *game, f32 delta)
         // move client plane on draw list if not already to prevent visual
         // lag
         if (plane->player_id == game->multiplayer.id)
-            plane->p = create_simple_plane(&game->client_plane);
+        {
+            plane->p = client_plane; // update plane
+        }
+
+        // check if planes bullets hit
+        for (size_t i = 0;
+             plane->player_id != game->multiplayer.id && i < MAX_BULLET_COUNT;
+             i++)
+        {
+            if (plane->p.active_bullets[i].used)
+            {
+                // TODO: make own function
+                Position bullet_pos = plane->p.active_bullets[i].p;
+                Position client_pos = client_plane.position;
+
+                Position diff = {
+                    .x = fabsf(bullet_pos.x - client_pos.x),
+                    .y = fabsf(bullet_pos.y - client_pos.y),
+                };
+
+                f32 magnitude = sqrtf(diff.x * diff.x + diff.y * diff.y);
+
+                if (magnitude < 16)
+                {
+                    log_info("Plane hit!");
+                    return 1;
+                }
+            }
+        }
 
         draw_plane(&game->plane_render, &client_plane, &plane->p);
-
-        // while drawing check for bullet interceptions
     }
 
     // draw ui
     draw_ui(&game->plane_render, &game->client_plane);
 
     render_submit(game->render);
-    return 1;
+    return 0;
 }
 
 Result game_loop()
@@ -166,7 +199,14 @@ Result game_loop()
             input_start_text_input(game.render);
         exit_connect:
             break;
-        case GAME_STATE_IN_FLIGHT: game_update(&game, delta); break;
+        case GAME_STATE_IN_FLIGHT:
+            if (game_update(&game, delta) == 1)
+            {
+                close_connection(
+                    &game.multiplayer.connection, game.multiplayer.id);
+                game.game_state = GAME_STATE_MAIN_MENU;
+            }
+            break;
         case GAME_STATE_DIED:
             // return to main menu to replay
             game.game_state = GAME_STATE_MAIN_MENU;
@@ -368,8 +408,12 @@ update_server_planes(const Connection *connection, struct PlaneList *plane_list)
                     break; // NOTE: will this break out of the upper while loop?
                 }
             }
-        case CONNECTION_UPDATE_ERROR: log_info("Sad"); break;
-        default: log_warning("Unexpected connection update type"); break;
+        case CONNECTION_UPDATE_ERROR:
+            log_warning("Connection update error");
+            break;
+        default:
+            log_warning("Unexpected connection update type %i", update.type);
+            break;
         }
         update = connection_pump_updates(connection);
     }

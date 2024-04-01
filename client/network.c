@@ -3,6 +3,7 @@
 #include <asm-generic/errno.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <messenger.h>
@@ -156,6 +157,13 @@ ConnectionUpdate connection_pump_updates(const Connection *c)
         update.plane_update.id          = inc_packet.data_packet.id;
         update.plane_update.plane       = inc_packet.data_packet.plane;
         update.plane_update.update_time = inc_packet.data_packet.update_time;
+
+        assert(
+            memcmp(
+                update.plane_update.plane.active_bullets,
+                inc_packet.data_packet.plane.active_bullets,
+                sizeof(update.plane_update.plane.active_bullets)) == 0);
+
         return update;
     default:
         log_error("Invalid packet type");

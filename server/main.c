@@ -1,6 +1,8 @@
 #include "packets.h"
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -28,6 +30,7 @@ const short SERVER_PORT = 8080;
 const short MAX_CLIENTS = 256;
 
 int main();
+void print_nonvoid_bullets(struct Bullet *bullets);
 
 void crash_handler(int)
 {
@@ -66,11 +69,11 @@ int main()
     {
         struct sockaddr client_addr;
         socklen_t client_addr_size = sizeof(client_addr);
-        Packet p;
+        Packet recieved_packet;
         if (recvfrom(
                 server_socket,
-                &p,
-                sizeof(p),
+                &recieved_packet,
+                sizeof(recieved_packet),
                 0,
                 &client_addr,
                 &client_addr_size) < 0)
@@ -79,14 +82,14 @@ int main()
             continue;
         }
         struct Connection *c; // store the connection node when relevant
-        switch (p.type)
+        switch (recieved_packet.type)
         {
         case PACKET_TYPE_EMPTY:
             // send same packet back
             sendto(
                 server_socket,
-                &p,
-                sizeof(p),
+                &recieved_packet,
+                sizeof(recieved_packet),
                 0,
                 &client_addr,
                 client_addr_size);
@@ -111,7 +114,7 @@ int main()
                     0,
                     &client_addr,
                     client_addr_size);
-                // add node
+                // add new client node
                 struct Connection *new_node = malloc(sizeof(struct Connection));
                 *new_node                   = (struct Connection){
                                       .client_addr     = client_addr,
@@ -129,16 +132,15 @@ int main()
             struct Connection *removed;
             LIST_FOREACH(c, &connection_list, data)
             {
-
                 // TODO: change so that is sends the disconnect to the client
                 // leaving
-                if (c->id != p.disconnect_packet.id)
+                if (c->id != recieved_packet.disconnect_packet.id)
                 {
                     // resend incoming packet to all connected, and remove them
                     sendto(
                         server_socket,
-                        &p,
-                        sizeof(p),
+                        &recieved_packet,
+                        sizeof(recieved_packet),
                         0,
                         &c->client_addr,
                         c->client_addr_len);
@@ -156,10 +158,11 @@ int main()
             // update all clients with plane info
             LIST_FOREACH(c, &connection_list, data)
             {
+                // debug bulet list not empty
                 if (sendto(
                         server_socket,
-                        &p,
-                        sizeof(p),
+                        &recieved_packet,
+                        sizeof(recieved_packet),
                         0,
                         &c->client_addr,
                         c->client_addr_len) == -1)
@@ -167,5 +170,30 @@ int main()
             }
             break;
         }
+    }
+}
+
+void print_nonvoid_bullets(struct Bullet *bullets)
+{
+    char str[MAX_BULLET_COUNT + 1]; // space for null char
+    memset(str, '\0', sizeof(str));
+    bool used = false;
+    for (size_t i = 0; i < MAX_BULLET_COUNT; i++)
+    {
+        if (bullets[i].used)
+        {
+            used   = true;
+            str[i] = 'X';
+        }
+        else
+        {
+            str[i] = '0';
+        }
+    }
+    if (!used)
+        return; // don't print empty list prevent spam
+    else
+    {
+        printf("Bullets array: %s\n", str);
     }
 }

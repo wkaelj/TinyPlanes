@@ -137,8 +137,8 @@ Result draw_plane(
     // draw bullets
     for (size_t i = 0; i < MAX_BULLET_COUNT; i++)
     {
-        if (client->active_bullets[i].used)
-            draw_bullet(r, &client->active_bullets[i], client);
+        if (drawn->active_bullets[i].used)
+            draw_bullet(r, &drawn->active_bullets[i], client);
     }
 
     // draw texture
