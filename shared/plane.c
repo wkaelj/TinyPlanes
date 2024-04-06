@@ -1,14 +1,13 @@
 #include "plane.h"
 #include "messenger.h"
 #include <assert.h>
-#include <math.h>
 #include <string.h>
 #include <sys/time.h>
 #include "utils.h"
 
-#define BULLET_DRAG 20
-#define BULLET_INITIAL_SPEED 800
-#define BULLET_MINIMUM_SPEED 400
+#define BULLET_DRAG 0.01
+#define BULLET_INITIAL_SPEED 1.75
+#define BULLET_MINIMUM_SPEED 1.5
 
 Plane create_plane(
     int plane_type,
@@ -24,7 +23,7 @@ Plane create_plane(
         .drag_factor       = drag,
         .thrust            = thrust,
         .min_speed         = min_speed,
-        .position          = POSITION(0.f, 0.f),
+        .position          = GLM_VEC2_ZERO_INIT,
         .heading           = 0.f,
         .throttle          = 1.f,
         .bullets_remaining = bullet_count,
@@ -39,9 +38,10 @@ SimplePlane create_simple_plane(Plane *p)
     SimplePlane out = {
         .plane_type = p->plane_type,
         .heading    = p->heading,
-        .position   = p->position,
         .velocity   = p->speed,
     };
+    // copy position
+    glm_vec2_copy(p->position, out.position);
     // copy active bullets
     memcpy(out.active_bullets, p->active_bullets, sizeof(out.active_bullets));
     return out;
@@ -55,12 +55,10 @@ void plane_update(Plane *p, f32 delta)
     if (p->speed < p->min_speed)
         p->speed = p->min_speed;
 
-    // calculate x and y offset for plane movement
-    f32 x_offset = p->speed * sinf(p->heading);
-    f32 y_offset = p->speed * cosf(p->heading);
+    vec2 offset = {0, p->speed * delta};
+    glm_vec2_rotate(offset, -p->heading, offset);
 
-    p->position.x += x_offset * delta;
-    p->position.y += y_offset * delta;
+    glm_vec2_add(p->position, offset, p->position);
 
     // update all bullets
     for (size_t i = 0; i < MAX_BULLET_COUNT; i++)
@@ -101,14 +99,14 @@ void plane_fire_bullet(Plane *p)
         .drag    = BULLET_DRAG,
         .heading = p->heading,
         .speed   = p->speed + BULLET_INITIAL_SPEED,
-        .p       = p->position,
     };
+    glm_vec2_copy(p->position, new_bullet.p);
+
     p->active_bullets[bullet_index] = new_bullet;
     p->next_fire_time               = time + p->fire_interval;
     p->bullets_remaining--;
 }
 
-void update_missile();
 void update_bullet(Bullet *bullet, f32 delta)
 {
     // do not operate on unused bullet
@@ -123,12 +121,11 @@ void update_bullet(Bullet *bullet, f32 delta)
         return;
     }
 
-    // calculate x and y offset for plane movement
-    f32 x_offset = bullet->speed * sinf(bullet->heading);
-    f32 y_offset = bullet->speed * cosf(bullet->heading);
+    vec2 offset = {0, 1};
+    glm_vec2_rotate(offset, -bullet->heading, offset);
+    glm_vec2_scale(offset, bullet->speed * delta, offset);
 
-    bullet->p.x += x_offset * delta;
-    bullet->p.y += y_offset * delta;
+    glm_vec2_add(bullet->p, offset, bullet->p);
 }
 
 void plane_turn(Plane *p, f32 delta, Direction d, f32 factor)

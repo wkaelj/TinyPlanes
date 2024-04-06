@@ -109,6 +109,7 @@ RenderResult render_draw_texture(
     const RenderRect *dst_rect,
     const RenderRect *src_rect,
     const RenderTexture *texture,
+    RenderCoord *pivot,
     float angle);
 
 RenderResult render_draw_rect(const Render *render, const RenderRect *rect);

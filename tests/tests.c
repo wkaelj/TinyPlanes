@@ -1,9 +1,6 @@
-#include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-
-#include "../shared/plane.h"
 
 // local access headers
 #include "_plane_render.h"
@@ -26,37 +23,72 @@
         ++test_count;                                             \
     } while (0)
 
-int test_count = 0;
+static int test_count = 0;
 
-char *test_test(void) { return NULL; }
-
-bool compare_position(Position p1, Position p2)
-{
-    return p1.x == p2.x && p1.y == p2.y;
-}
+bool compare_position(vec2 p1, vec2 p2) { return glm_vec2_eqv(p1, p2); }
 
 char *test_plane_local(void)
 {
-    Position input           = {0, 0};
-    Position client_plane    = {0, 10};
-    Position expected_output = {.x = 10.f, .y = 0.f};
-    f32 heading              = 0;
-    f32 expected_heading     = M_PI_2;
-    Position p = convert_point_relative(input, client_plane, heading);
-    printf("p = (%f, %f)\n", p.x, p.y);
-    TEST_ASSERT(
-        compare_position(p, expected_output), "Incorrect output position");
-    TEST_ASSERT(
-        convert_rotation_relative(heading, expected_heading),
-        "Incorrect output rotation");
+    {
+        vec2 input           = {0, 0};
+        vec2 client_plane    = {0, 10};
+        vec2 expected_output = {0, -10};
+        f32 heading          = 0;
+        vec2 p;
+        apply_client_transform(client_plane, heading, input, p);
+        printf("p = (%f, %f)\n", p[0], p[1]);
+        TEST_ASSERT(
+            compare_position(p, expected_output),
+            "Incorrect output position 1");
+    }
+
+    {
+        vec2 input           = {10, 0};
+        vec2 client_plane    = {0, 0};
+        vec2 expected_output = {0, -10};
+        f32 heading          = M_PI_2;
+        vec2 p;
+        apply_client_transform(client_plane, heading, input, p);
+        printf("p = (%f, %f)\n", p[0], p[1]);
+        TEST_ASSERT(
+            compare_position(p, expected_output),
+            "Incorrect output position 2");
+    }
 
     return NULL;
 }
 
-int main(int argc, char **argv)
+char *test_rotation_local()
 {
-    TEST(test_test());
+    f32 input_heading  = M_PI;
+    f32 client_heading = M_PI_2;
+    f32 output_heading =
+        convert_rotation_relative(input_heading, client_heading);
+
+    f32 expected_heading = M_PI_2;
+
+    TEST_ASSERT(output_heading == expected_heading, "Incorrect heading");
+
+    return NULL;
+}
+
+char *test_pos_to_screen(void)
+{
+    vec2 out;
+    ivec2 screen = {1920, 1080};
+    pos_to_screen(screen, (vec2){-1, 1}, out);
+    TEST_ASSERT(glm_vec2_eqv(out, (vec2){0, 0}), "Incorrect position");
+    pos_to_screen(screen, (vec2){1, -1}, out);
+    TEST_ASSERT(glm_vec2_eqv(out, (vec2){1920, 1080}), "Incorrect position");
+
+    return NULL;
+}
+
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+{
     TEST(test_plane_local());
+    TEST(test_pos_to_screen());
+    TEST(test_rotation_local());
 
     return 0;
 }

@@ -80,16 +80,11 @@ int game_update(GameData *game, f32 delta)
         {
             if (plane->p.active_bullets[i].used)
             {
-                // TODO: make own function
-                Position bullet_pos = plane->p.active_bullets[i].p;
-                Position client_pos = client_plane.position;
+                vec2 diff;
+                glm_vec2_sub(
+                    plane->p.active_bullets[i].p, client_plane.position, diff);
 
-                Position diff = {
-                    .x = fabsf(bullet_pos.x - client_pos.x),
-                    .y = fabsf(bullet_pos.y - client_pos.y),
-                };
-
-                f32 magnitude = sqrtf(diff.x * diff.x + diff.y * diff.y);
+                f32 magnitude = glm_vec2_distance(GLM_VEC2_ZERO, diff);
 
                 if (magnitude < 16)
                 {
@@ -101,9 +96,6 @@ int game_update(GameData *game, f32 delta)
 
         draw_plane(&game->plane_render, &client_plane, &plane->p);
     }
-
-    // draw ui
-    draw_ui(&game->plane_render, &game->client_plane);
 
     render_submit(game->render);
     return 0;

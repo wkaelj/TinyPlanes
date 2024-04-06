@@ -18,11 +18,20 @@ typedef enum Direction
 typedef struct Bullet
 {
     bool used; // know if a bullet buffer location is in use
-    Position p;
+    vec2 p;
     f32 heading;
     f32 speed;
     f32 drag;
 } Bullet;
+
+typedef struct Missile
+{
+    bool used;
+    vec2 p;
+    f32 heading;
+    f32 speed;
+    f32 drag;
+} Missile;
 
 typedef struct Plane
 {
@@ -38,7 +47,7 @@ typedef struct Plane
     f32 throttle;
     f32 heading;
 
-    Position position; // airplane position
+    vec2 position; // airplane position
 
     // ammunition
     size_t bullets_remaining;
@@ -51,7 +60,7 @@ typedef struct Plane
 typedef struct SimplePlane
 {
     int plane_type;
-    Position position;
+    vec2 position;
     f32 heading;
     f32 velocity;
 
@@ -77,11 +86,12 @@ void plane_turn(Plane *p, f32 delta, Direction d, f32 factor);
 
 void plane_fire_bullet(Plane *p);
 
-void update_missile();
+void update_missile(
+    Missile *missile, const SimplePlane *missile_target, f32 delta);
 void update_bullet(Bullet *bullet, f32 delta);
 
 // move an airplane to position p without changing speed or heading
-static inline void plane_set_position(Plane *plane, Position p)
+static inline void plane_set_position(Plane *plane, vec2 p)
 {
-    plane->position = p;
+    glm_vec2_copy(p, plane->position);
 }

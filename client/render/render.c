@@ -235,16 +235,18 @@ RenderResult render_draw_texture(
     const RenderRect *dst_rect,
     const RenderRect *src_rect,
     const RenderTexture *texture,
+    RenderCoord *pivot,
     float angle)
 {
     SDL_Rect dest = convert_rect(dst_rect, render->pixel_scale);
+
     return SDL_RenderCopyEx(
                render->sdl_render,
                texture->sdl_texture,
                (SDL_Rect *)src_rect,
                &dest,
                angle * (180.f / M_PI),
-               NULL,
+               (SDL_Point *)pivot,
                SDL_FLIP_NONE) == 0
                ? RENDER_SUCCESS
                : RENDER_FAILURE;

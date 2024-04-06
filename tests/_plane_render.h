@@ -3,7 +3,8 @@
 #include <types.h>
 typedef void *Render;
 
-Position convert_point_relative(
-    Position input, Position client_plane, f32 client_heading);
 f32 convert_rotation_relative(f32 input, f32 client_heading);
-Position pos_to_screen(const Render *restrict r, Position p);
+void pos_to_screen(ivec2 screen_size, vec2 p, vec2 out);
+
+void apply_client_transform(
+    vec2 client_position, f32 client_rotation, vec2 position, vec2 dest);

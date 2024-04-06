@@ -24,11 +24,10 @@ NONULL(1) PlaneRender create_plane_render(const Render *r, RenderFont *ui_font);
 void destroy_plane_render(PlaneRender *render);
 
 NONULL(1, 2, 3)
-Result draw_plane(
-    const PlaneRender *r, const SimplePlane *client, const SimplePlane *drawn);
+Result
+draw_plane(const PlaneRender *r, SimplePlane *client, SimplePlane *drawn);
 
 NONULL(1, 2)
-Result draw_terrain(const PlaneRender *r, const SimplePlane *client);
-NONULL(1, 2) Result draw_ui(PlaneRender *render, const Plane *client);
+Result draw_terrain(const PlaneRender *r, SimplePlane *client);
 
 NONULL(1) Result draw_menu_bg(const PlaneRender *render);

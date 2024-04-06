@@ -3,11 +3,12 @@ BUILD:=build
 CLIENT_DIR:=client
 SERVER_DIR:=server
 SHARED_DIR:=shared
+LIBS_DIR:=libs
 
 STD:=gnu2x
 CC:=cc
 
-CFLAGS := -Wall -Wextra -pedantic -std=$(STD) -Og -g -I./$(SHARED_DIR)
+CFLAGS := -Wall -Wextra -pedantic -std=$(STD) -Og -g -I./$(SHARED_DIR) -I./$(LIBS_DIR)
 # CFLAGS += -fsanitize=address
 LDFLAGS:= -lSDL2 -lSDL2_image -lSDL2_ttf -lm
 
@@ -47,6 +48,7 @@ dirs:
 	$(CREATE_DIRS) 
  
 test: $(TEST_SRC) $(wildcard tests/*.c)
+	echo $^
 	$(CC) -o tests/test.out -g -O0 $^ $(LDFLAGS) -I./shared -I./client -I./server
 	./tests/test.out
 

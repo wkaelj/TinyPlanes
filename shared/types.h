@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#define CGLM_DEFINE_PRINTS
+
+#include <cglm/cglm.h>
+
 #define array_length(array) (sizeof(array) / sizeof(array[0]))
 
 #define NONULL(...) __attribute__((nonnull(__VA_ARGS__)))
@@ -22,11 +26,3 @@ typedef int64_t i64;
 typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
-
-typedef struct Position
-{
-    f32 x, y;
-} Position;
-
-#define POSITION(x, y) \
-    (Position) { x, y }
