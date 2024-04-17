@@ -34,6 +34,9 @@ typedef struct GameData
 
     RenderWindow *window;
     Render *render;
+
+    ChunkList chunk_list;
+
     struct
     {
         RenderButton *exit;
@@ -52,6 +55,7 @@ typedef struct GameData
         Connection connection;
         uid_t id; // this client's id, recieved from server
         size_t player_count;
+        int seed; // world seed
         LIST_HEAD(PlaneList, PlaneNode) plane_list;
     } multiplayer;
 

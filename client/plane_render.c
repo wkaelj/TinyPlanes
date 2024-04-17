@@ -10,7 +10,6 @@
 
 #include "messenger.h"
 #include "plane_types.h"
-
 static const f32 PLANE_SIZE_PX = 0.2;
 
 const f32 CLIENT_DRAWN_HEADING = M_PI_2; // client plane is drawn pointing up
@@ -205,6 +204,25 @@ Result draw_terrain(const PlaneRender *r, SimplePlane *client)
         0,
         (vec2){16, 16},
         GLM_VEC2_ZERO,
+        client->position,
+        client->heading);
+}
+
+NONULL(1, 2)
+Result draw_chunk(const PlaneRender *r, SimplePlane *client, const Chunk *c)
+{
+    vec2 chunk_pos = {
+        c->grid_coordinate[0] * CHUNK_SIZE, c->grid_coordinate[1] * CHUNK_SIZE};
+    // try and remove gap between chunks due to aliasing
+    glm_vec2_scale(chunk_pos, 0.995f, chunk_pos);
+
+    return draw_texture_relative(
+        r->render,
+        c->texture,
+        NULL,
+        0,
+        (vec2){CHUNK_SIZE, CHUNK_SIZE},
+        chunk_pos,
         client->position,
         client->heading);
 }

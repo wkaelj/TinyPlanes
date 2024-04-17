@@ -6,7 +6,7 @@
 
 #include <cglm/cglm.h>
 
-#define array_length(array) (sizeof(array) / sizeof(array[0]))
+#define array_length(array) ((size_t)sizeof(array) / (size_t)sizeof(array[0]))
 
 #define NONULL(...) __attribute__((nonnull(__VA_ARGS__)))
 

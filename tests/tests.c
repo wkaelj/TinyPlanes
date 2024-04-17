@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include <unistd.h>
+#include "../client/perlin_noise.h"
+
+#include <SDL2/SDL.h>
+
 // local access headers
 #include "_plane_render.h"
 
@@ -84,11 +89,74 @@ char *test_pos_to_screen(void)
     return NULL;
 }
 
+char *test_perlin_noise(void)
+{
+    SDL_Init(SDL_INIT_VIDEO);
+
+    int w = 0, h = 600;
+
+    SDL_Window *window = SDL_CreateWindow(
+        "Perlin Demo",
+        200,
+        500,
+        w,
+        h,
+        SDL_WINDOW_FULLSCREEN | SDL_WINDOW_ALWAYS_ON_TOP);
+
+    SDL_Renderer *render = SDL_CreateRenderer(
+        window, 0, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
+    SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
+    SDL_RenderClear(render);
+    SDL_RenderPresent(render);
+
+    SDL_GetWindowSizeInPixels(window, &w, &h);
+
+    SDL_Texture *texture = SDL_CreateTexture(
+        render, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, 1000, 1000);
+
+    int tw = 1000, th = 1000;
+
+    SDL_SetRenderTarget(render, texture);
+    const i32 oct         = 5;
+    const f64 persistance = 0.5;
+
+    for (int x = 0; x < tw; x++)
+    {
+        for (int y = 0; y < th; y++)
+        {
+            f64 n = octave_perlin_noise(
+                (float)x / 100, (float)y / 100, 1, oct, persistance);
+
+            n += 1;
+            n /= 2;
+
+            SDL_SetRenderDrawColor(render, 255 * n, 255 * n, 255 * n, 255);
+            SDL_RenderDrawPoint(render, x, y);
+            SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
+        }
+    }
+
+    SDL_SetRenderTarget(render, NULL);
+    SDL_Rect out_rect = {0, 0, w, h};
+    SDL_RenderCopy(render, texture, NULL, &out_rect);
+    SDL_RenderPresent(render);
+    sleep(2);
+
+    SDL_DestroyTexture(texture);
+
+    SDL_DestroyRenderer(render);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return NULL;
+}
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     TEST(test_plane_local());
     TEST(test_pos_to_screen());
     TEST(test_rotation_local());
+    TEST(test_perlin_noise());
 
     return 0;
 }

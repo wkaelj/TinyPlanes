@@ -14,7 +14,7 @@
 #include <utils.h>
 
 // busted macro should never have been done
-#define SKY_COLOUR 180, 190, 230, 255
+#define SKY_COLOUR ((RenderColour){180, 190, 230, 255})
 static inline f64 get_delta(size_t fps_limit);
 void render_debug_text(const Render *r, const RenderFont *font, const char *t);
 
@@ -60,7 +60,12 @@ int game_update(GameData *game, f32 delta)
     render_set_colour(game->render, SKY_COLOUR);
     render_clear(game->render);
 
-    draw_terrain(&game->plane_render, &client_plane);
+    update_chunk_list(game->render, &game->chunk_list, client_plane.position);
+    for (size_t i = 0; i < game->chunk_list.chunk_count; i++)
+    {
+        draw_chunk(
+            &game->plane_render, &client_plane, &game->chunk_list.chunks[i]);
+    }
 
     // draw planes
     struct PlaneNode *plane;
@@ -86,7 +91,7 @@ int game_update(GameData *game, f32 delta)
 
                 f32 magnitude = glm_vec2_distance(GLM_VEC2_ZERO, diff);
 
-                if (magnitude < 16)
+                if (magnitude < 0.03)
                 {
                     log_info("Plane hit!");
                     return 1;
@@ -286,6 +291,10 @@ Result init_game(GameData *g)
 
     // client plane
     g->client_plane = create_plane_type(PLANE_TYPE_FA18);
+
+    // create chunk list
+    g->chunk_list = create_chunk_list(g->render, 2);
+
     // initialize plane list
     LIST_INIT(&g->multiplayer.plane_list);
     return RS_SUCCESS;
@@ -336,6 +345,11 @@ Result update_client_plane(GameData *game, f32 delta)
         plane_turn(&game->client_plane, delta, LEFT, 1.f);
     else if (input_is_key_pressed(game->render, SDL_SCANCODE_RIGHT))
         plane_turn(&game->client_plane, delta, RIGHT, 1.f);
+
+    if (input_is_key_pressed(game->render, SDL_SCANCODE_G))
+    {
+        glm_vec2_copy(GLM_VEC2_ZERO, game->client_plane.position);
+    }
 
     // update throttle
     const f32 THROTTLE_INCREMENT = 0.01f;

@@ -1,3 +1,6 @@
 [submodule "libs/cglm"]
 	path = libs/cglm
 	url = https://github.com/recp/cglm.git
+[submodule "libs/cutils"]
+	path = libs/cutils
+	url = https://github.com/wkaelj/cutils.git

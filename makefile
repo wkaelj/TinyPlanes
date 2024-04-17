@@ -10,6 +10,7 @@ CC:=cc
 
 CFLAGS := -Wall -Wextra -pedantic -std=$(STD) -Og -g -I./$(SHARED_DIR) -I./$(LIBS_DIR)
 # CFLAGS += -fsanitize=address
+CFLAGS += -fopenmp
 LDFLAGS:= -lSDL2 -lSDL2_image -lSDL2_ttf -lm
 
 CLIENT_SRC:=$(wildcard $(CLIENT_DIR)/*.c) $(wildcard $(CLIENT_DIR)/**/*.c)
@@ -21,10 +22,15 @@ SERVER_OBJ:=$(SERVER_SRC:%.c=$(BUILD)/%.o)
 SHARED_SRC:=$(wildcard $(SHARED_DIR)/*.c)
 SHARED_OBJ:=$(SHARED_SRC:%.c=$(BUILD)/%.o)
 
-TEST_SRC:=$(filter-out $(wildcard build/**/main.o),$(CLIENT_OBJ) $(SERVER_OBJ) $(SHARED_OBJ))
+NOISE_SRC:=$(wildcard $(LIBS_DIR)/noise1234/*.c)
+LIBS_OBJ:=$(LIBS_SRC:%.c=$(BUILD)/%.o)
+
+
+TEST_SRC:=$(filter-out $(wildcard build/**/main.o),$(CLIENT_OBJ) $(SERVER_OBJ) $(SHARED_OBJ) $(LIBS_SRC))
 
 # used to easily create dirs
-CREATE_DIRS := mkdir -p $(BUILD)/$(CLIENT_DIR)/render $(BUILD)/$(SERVER_DIR) $(BUILD)/$(SHARED_DIR)
+CREATE_DIRS := mkdir -p $(BUILD)/$(CLIENT_DIR)/render $(BUILD)/$(SERVER_DIR) 
+CREATE_DIRS += $(BUILD)/$(SHARED_DIR) $(BUILD)/$(LIBS_DIR)/noise1234
 
 ifndef VERBOSE
 MAKEFLAGS += --silent
@@ -52,7 +58,7 @@ test: $(TEST_SRC) $(wildcard tests/*.c)
 	$(CC) -o tests/test.out -g -O0 $^ $(LDFLAGS) -I./shared -I./client -I./server
 	./tests/test.out
 
-client.out: $(CLIENT_OBJ) $(SHARED_OBJ)
+client.out: $(CLIENT_OBJ) $(SHARED_OBJ) $(NOISE_OBJ)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 server.out: $(SERVER_OBJ) $(SHARED_OBJ)

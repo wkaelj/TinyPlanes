@@ -1,0 +1,9 @@
+
+set(SHARED_NAME ${PROJECT_NAME}_shared)
+
+message(${CMAKE_CURRENT_SOURCE_DIR})
+
+file(GLOB SOURCES ${CMAKE_CURRENT_LIST_DIR}/*.c)
+
+add_library(${SHARED_NAME} STATIC ${SOURCES})
+target_include_directories(${SHARED_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR})

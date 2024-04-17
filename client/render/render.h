@@ -4,7 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __GNUC__
 #define RENDER_WARN_RESULT [[gnu::warn_unused_result]]
+#else
+#define RENDER_WARN_RESULT ((void)0)
+#endif
 
 typedef enum
 {
@@ -117,8 +121,8 @@ RenderResult
 render_draw_rects(const Render *render, const RenderRect *rects, size_t n);
 RenderResult render_draw_text(
     const Render *r, const RenderText *text, const RenderRect *rect);
-RenderResult render_set_colour(
-    const Render *render, uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+RenderResult render_draw_point(const Render *render, int x, int y);
+RenderResult render_set_colour(const Render *render, RenderColour c);
 
 // clear the screen of any drawings. should be called at the beginning of a
 // frame to avoid the last frame staying in undrawn areas
@@ -132,10 +136,15 @@ RenderEvent render_poll_events(Render *render);
 
 RENDER_WARN_RESULT RenderTexture *
 render_create_texture(const Render *render, const char *texture_path);
+RENDER_WARN_RESULT RenderTexture *
+render_create_drawable_texture(const Render *render, int w, int h);
 void render_destroy_texture(RenderTexture *texture);
 RenderResult
 render_set_texture_alpha(const RenderTexture *texture, uint8_t alpha);
 RenderResult render_get_texture_size(const RenderTexture *t, int *w, int *h);
+// set render to draw to a texture, pass NULL to draw to window
+RenderResult
+render_set_drawing_target(const Render *render, const RenderTexture *texture);
 
 // font_path is a path to .ttf font
 RENDER_WARN_RESULT RenderFont *

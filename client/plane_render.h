@@ -4,6 +4,8 @@
 #include "render/render.h"
 #include "types.h"
 
+#include "chunk.h"
+
 typedef struct PlaneRender
 {
     const Render *render; // reference to a render to use
@@ -29,5 +31,8 @@ draw_plane(const PlaneRender *r, SimplePlane *client, SimplePlane *drawn);
 
 NONULL(1, 2)
 Result draw_terrain(const PlaneRender *r, SimplePlane *client);
+
+NONULL(1, 2)
+Result draw_chunk(const PlaneRender *r, SimplePlane *client, const Chunk *c);
 
 NONULL(1) Result draw_menu_bg(const PlaneRender *render);

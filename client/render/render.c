@@ -149,6 +149,9 @@ bool render_is_initialized() { return render_initialized; }
 
 RenderWindow *render_create_window(const char *title, int w, int h)
 {
+
+    if (render_is_initialized() == false)
+        return NULL;
     RenderWindow *window = alloc(RenderWindow);
     window->sdl_window   = SDL_CreateWindow(
         title, 0, 0, w, h, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
@@ -161,6 +164,9 @@ RenderWindow *render_create_window(const char *title, int w, int h)
 
 Render *render_create_render(RenderWindow *window)
 {
+    if (window == NULL || render_is_initialized() == false)
+        return NULL;
+
     Render *render     = alloc(Render);
     render->sdl_render = SDL_CreateRenderer(
         window->sdl_window,
@@ -252,10 +258,9 @@ RenderResult render_draw_texture(
                : RENDER_FAILURE;
 }
 
-RenderResult render_set_colour(
-    const Render *render, uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+RenderResult render_set_colour(const Render *render, RenderColour c)
 {
-    return SDL_SetRenderDrawColor(render->sdl_render, r, g, b, a) == 0
+    return SDL_SetRenderDrawColor(render->sdl_render, c.r, c.g, c.b, c.a) == 0
                ? RENDER_SUCCESS
                : RENDER_FAILURE;
 }
@@ -266,6 +271,12 @@ RenderResult render_draw_rect(const Render *render, const RenderRect *rect)
     return SDL_RenderFillRect(render->sdl_render, &sdl_rect) == 0
                ? RENDER_SUCCESS
                : RENDER_FAILURE;
+}
+
+RenderResult render_draw_point(const Render *render, int x, int y)
+{
+    return SDL_RenderDrawPoint(render->sdl_render, x, y) == 0 ? RENDER_SUCCESS
+                                                              : RENDER_FAILURE;
 }
 
 RenderResult
@@ -373,9 +384,11 @@ render_create_texture(const Render *render, const char *texture_path)
 {
     RenderTexture *t = alloc(RenderTexture);
 
-    t->sdl_texture = SDL_CreateTextureFromSurface(
-        render->sdl_render, IMG_Load(texture_path));
+    SDL_Surface *s = IMG_Load(texture_path);
 
+    t->sdl_texture = SDL_CreateTextureFromSurface(render->sdl_render, s);
+
+    SDL_FreeSurface(s);
     if (t->sdl_texture == NULL)
     {
         free(t);
@@ -385,6 +398,19 @@ render_create_texture(const Render *render, const char *texture_path)
         return t;
 }
 
+RenderTexture *
+render_create_drawable_texture(const Render *render, int w, int h)
+{
+    RenderTexture *t = alloc(RenderTexture);
+    t->sdl_texture   = SDL_CreateTexture(
+        render->sdl_render,
+        SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET,
+        w,
+        h);
+
+    return t;
+}
 void render_destroy_texture(RenderTexture *texture)
 {
     SDL_DestroyTexture(texture->sdl_texture);
@@ -405,6 +431,15 @@ RenderResult render_get_texture_size(const RenderTexture *t, int *w, int *h)
         return RENDER_FAILURE;
 
     return RENDER_SUCCESS;
+}
+
+RenderResult
+render_set_drawing_target(const Render *render, const RenderTexture *texture)
+{
+    return SDL_SetRenderTarget(
+               render->sdl_render, texture ? texture->sdl_texture : NULL) == 0
+               ? RENDER_SUCCESS
+               : RENDER_FAILURE;
 }
 
 RenderFont *render_create_font(
@@ -583,24 +618,20 @@ void render_button_draw(const Render *render, RenderButton *button)
         button->position.y,
         outerRect.w + button->borderWidth * 2,
         outerRect.h + button->borderWidth * 2);
-    render_set_colour(
-        render,
-        button->borderColour.r,
-        button->borderColour.g,
-        button->borderColour.b,
-        button->borderColour.a);
+    render_set_colour(render, button->borderColour);
     render_draw_rect(render, &borderRect);
 
     // draw background
-    bool hovered = render_button_hovered(render, button);
-    int dif      = -20;
+    bool hovered               = render_button_hovered(render, button);
+    int diff                   = -20;
+    RenderColour hoveredColour = {
+        button->backgroundColour.r + diff,
+        button->backgroundColour.g + diff,
+        button->backgroundColour.b + diff,
+        button->backgroundColour.a,
+    };
     render_set_colour(
-        render,
-        hovered ? button->backgroundColour.r + dif : button->backgroundColour.r,
-        hovered ? button->backgroundColour.g + dif : button->backgroundColour.g,
-        hovered ? button->backgroundColour.b + dif : button->backgroundColour.b,
-        hovered ? button->backgroundColour.a + dif
-                : button->backgroundColour.a);
+        render, hovered ? hoveredColour : button->backgroundColour);
     render_draw_rect(render, &outerRect);
 
     // draw text
