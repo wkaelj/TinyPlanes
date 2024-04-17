@@ -155,14 +155,13 @@ void move_chunk(const Render *r, Chunk *c, ivec2 new_coordinate)
     fill_chunk(r, c->texture, c->grid_coordinate);
 }
 
+static inline i32 signof(f64 x) { return (x > 0) - (x < 0); }
+
 // find which grid coordinate point is in, stores it in dest
 void chunk_containing(vec2 point, ivec2 dest)
 {
-    f32 ix = (i32)(point[0]);
-    f32 iy = (i32)(point[1]);
-
-    dest[0] = ix / (CHUNK_SIZE / 2);
-    dest[1] = iy / (CHUNK_SIZE / 2);
+    dest[0] = (point[0] + signof(point[0]) * CHUNK_SIZE / 2) / CHUNK_SIZE;
+    dest[1] = (point[1] + signof(point[1]) * CHUNK_SIZE / 2) / CHUNK_SIZE;
 }
 
 ChunkList create_chunk_list(const Render *r, f32 load_radius)
