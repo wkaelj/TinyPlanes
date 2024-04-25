@@ -63,8 +63,6 @@ PlaneRender create_plane_render(const Render *render, RenderFont *ui_font)
         .render = render, // epic bug prone code
         .plane_textures =
             render_create_texture(p.render, "textures/plane_atlas.png"),
-        .terrain_texture =
-            render_create_texture(render, "textures/terrain_forest.png"),
         .bullet_texture = render_create_texture(render, "textures/bullet.png"),
         .ui_atlas = render_create_texture(render, "textures/ui_atlas.png"),
         .main_menu_texture =
@@ -78,8 +76,6 @@ PlaneRender create_plane_render(const Render *render, RenderFont *ui_font)
 
     if (p.plane_textures == NULL)
         log_error("Failed to load plane textures");
-    if (p.terrain_texture == NULL)
-        log_error("Failed to load terrain textures");
     if (p.bullet_texture == NULL)
         log_error("Failed to load bullet texture");
     if (p.ui_atlas == NULL)
@@ -96,12 +92,11 @@ void destroy_plane_render(PlaneRender *render)
         render_destroy_text(render->ui_bullet_display);
     if (render->ui_speed_display)
         render_destroy_text(render->ui_speed_display);
+
     if (render->plane_textures)
         render_destroy_texture(render->plane_textures);
     if (render->bullet_texture)
         render_destroy_texture(render->bullet_texture);
-    if (render->terrain_texture)
-        render_destroy_texture(render->terrain_texture);
     if (render->ui_atlas)
         render_destroy_texture(render->ui_atlas);
     if (render->main_menu_texture)
@@ -193,29 +188,16 @@ Result draw_plane(const PlaneRender *r, SimplePlane *client, SimplePlane *drawn)
         client->heading);
 }
 
-Result draw_terrain(const PlaneRender *r, SimplePlane *client)
-{
-    assert(r->terrain_texture);
-
-    return draw_texture_relative(
-        r->render,
-        r->terrain_texture,
-        NULL,
-        0,
-        (vec2){16, 16},
-        GLM_VEC2_ZERO,
-        client->position,
-        client->heading);
-}
-
 NONULL(1, 2)
 Result draw_chunk(const PlaneRender *r, SimplePlane *client, const Chunk *c)
 {
     vec2 chunk_pos = {
         c->grid_coordinate[0] * CHUNK_SIZE, c->grid_coordinate[1] * CHUNK_SIZE};
     // try and remove gap between chunks due to aliasing
+
     glm_vec2_scale(chunk_pos, 0.995f, chunk_pos);
 
+    assert(c->texture);
     return draw_texture_relative(
         r->render,
         c->texture,

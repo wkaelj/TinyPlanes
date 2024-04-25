@@ -22,6 +22,7 @@ void render_debug_text(const Render *r, const RenderFont *font, const char *t);
 Result init_game(GameData *g);
 
 void destroy_game(GameData *g);
+void clean_server_planes(GameData *game);
 
 // move the client plane based on input
 Result update_client_plane(GameData *g, f32 delta);
@@ -56,12 +57,14 @@ int game_update(GameData *game, f32 delta)
     update_server_planes(
         &game->multiplayer.connection, &game->multiplayer.plane_list);
 
+    chunk_list_lock(&game->chunk_list);
+
     // draw
     render_set_colour(game->render, SKY_COLOUR);
     render_clear(game->render);
 
     update_chunk_list(game->render, &game->chunk_list, client_plane.position);
-    for (size_t i = 0; i < game->chunk_list.chunk_count; i++)
+    for (size_t i = 0; i < CHUNK_COUNT; i++)
     {
         draw_chunk(
             &game->plane_render, &client_plane, &game->chunk_list.chunks[i]);
@@ -103,6 +106,7 @@ int game_update(GameData *game, f32 delta)
     }
 
     render_submit(game->render);
+    chunk_list_unlock(&game->chunk_list);
     return 0;
 }
 
@@ -149,11 +153,13 @@ Result game_loop()
             {
                 // get text input for server ip
                 const char *txt = input_get_input_text(game.render);
-                assert(array_length(game.multiplayer.server_ip) == 16);
-                strncpy(
-                    game.multiplayer.server_ip,
-                    txt,
-                    array_length(game.multiplayer.server_ip));
+                if (strlen(txt) > 7)
+                {
+                    strncpy(
+                        game.multiplayer.server_ip,
+                        txt,
+                        array_length(game.multiplayer.server_ip) - 1);
+                }
 
                 log_info(
                     "Switching to game state CONNECTING\n, Input IP %s",
@@ -201,7 +207,9 @@ Result game_loop()
             {
                 close_connection(
                     &game.multiplayer.connection, game.multiplayer.id);
-                game.game_state = GAME_STATE_MAIN_MENU;
+                // free plane list
+                clean_server_planes(&game);
+                game.game_state = GAME_STATE_DIED;
             }
             break;
         case GAME_STATE_DIED:
@@ -293,23 +301,31 @@ Result init_game(GameData *g)
     g->client_plane = create_plane_type(PLANE_TYPE_FA18);
 
     // create chunk list
-    g->chunk_list = create_chunk_list(g->render, 2);
+    g->chunk_list = create_chunk_list(g->render);
 
     // initialize plane list
     LIST_INIT(&g->multiplayer.plane_list);
+    // store local ip for convenience
+    strcpy(g->multiplayer.server_ip, "127.0.0.1");
     return RS_SUCCESS;
 }
 
-void destroy_game(GameData *game)
+void clean_server_planes(GameData *game)
 {
     // free plane list, as planes connected when client disconnects could leak
-    struct PlaneNode *node;
     while (LIST_EMPTY(&game->multiplayer.plane_list) == false)
     {
+        struct PlaneNode *node;
         node = LIST_FIRST(&game->multiplayer.plane_list);
         LIST_REMOVE(node, data);
         free(node);
     }
+}
+
+void destroy_game(GameData *game)
+{
+    clean_server_planes(game);
+    destroy_chunk_list(&game->chunk_list);
 
     destroy_plane_render(&game->plane_render);
     // destroy menu buttons
@@ -392,7 +408,8 @@ update_server_planes(const Connection *connection, struct PlaneList *plane_list)
                 }
             }
             // assume that the plane is new, hence not in the list, and add it
-            node               = malloc(sizeof(struct PlaneNode));
+            node = malloc(sizeof(struct PlaneNode));
+            assert(node);
             node->player_id    = update.plane_update.id;
             node->last_updated = update.plane_update.update_time;
             node->p            = update.plane_update.plane;

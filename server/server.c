@@ -1,4 +1,5 @@
 #include "packets.h"
+#include <assert.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +43,7 @@ void crash_handler(int)
 int main()
 {
     signal(SIGSEGV, crash_handler);
+
     // list of connected clients
     LIST_HEAD(ConnectionList, Connection) connection_list;
     LIST_INIT(&connection_list);
@@ -55,6 +57,7 @@ int main()
         .sin_addr.s_addr = INADDR_ANY,
     };
     int server_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    assert(server_socket != -1);
     // TODO error check
     if (bind(
             server_socket,
@@ -116,10 +119,11 @@ int main()
                     client_addr_size);
                 // add new client node
                 struct Connection *new_node = malloc(sizeof(struct Connection));
-                *new_node                   = (struct Connection){
-                                      .client_addr     = client_addr,
-                                      .client_addr_len = client_addr_size,
-                                      .id              = cpack.return_uid,
+                assert(new_node);
+                *new_node = (struct Connection){
+                    .client_addr     = client_addr,
+                    .client_addr_len = client_addr_size,
+                    .id              = cpack.return_uid,
                 };
                 LIST_INSERT_HEAD(&connection_list, new_node, data);
                 client_count++;
@@ -129,29 +133,24 @@ int main()
             log_info("A client has disconnected");
             // send disconnect and id to all clients
             // and delete the node when encountered
-            struct Connection *removed;
+            struct Connection *removed = NULL;
             LIST_FOREACH(c, &connection_list, data)
             {
-                // TODO: change so that is sends the disconnect to the client
-                // leaving
-                if (c->id != recieved_packet.disconnect_packet.id)
-                {
-                    // resend incoming packet to all connected, and remove them
-                    sendto(
-                        server_socket,
-                        &recieved_packet,
-                        sizeof(recieved_packet),
-                        0,
-                        &c->client_addr,
-                        c->client_addr_len);
-                }
-                else
+                if (c->id == recieved_packet.disconnect_packet.id)
                 {
                     removed = c; // set so it can be removed after loop
                 }
+                sendto(
+                    server_socket,
+                    &recieved_packet,
+                    sizeof(recieved_packet),
+                    0,
+                    &c->client_addr,
+                    c->client_addr_len);
             }
             LIST_REMOVE(removed, data);
-            free(removed);
+            if (removed)
+                free(removed);
             client_count--;
             break;
         case PACKET_TYPE_PLANE:

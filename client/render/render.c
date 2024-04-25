@@ -142,6 +142,7 @@ void render_quit()
     render_initialized = false;
     TTF_Quit();
     IMG_Quit();
+    SDL_TLSCleanup();
     SDL_Quit();
 }
 
@@ -153,7 +154,8 @@ RenderWindow *render_create_window(const char *title, int w, int h)
     if (render_is_initialized() == false)
         return NULL;
     RenderWindow *window = alloc(RenderWindow);
-    window->sdl_window   = SDL_CreateWindow(
+    assert(window);
+    window->sdl_window = SDL_CreateWindow(
         title, 0, 0, w, h, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
 
     if (window->sdl_window)
@@ -164,16 +166,17 @@ RenderWindow *render_create_window(const char *title, int w, int h)
 
 Render *render_create_render(RenderWindow *window)
 {
-    if (window == NULL || render_is_initialized() == false)
-        return NULL;
-
-    Render *render     = alloc(Render);
+    Render *render = alloc(Render);
+    assert(render);
     render->sdl_render = SDL_CreateRenderer(
         window->sdl_window,
         0,
         SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (render->sdl_render == NULL)
+    {
+        free(render);
         return NULL;
+    }
 
     SDL_GetMouseState(&render->cursor_x, &render->cursor_y);
 
@@ -204,6 +207,7 @@ Render *render_create_render(RenderWindow *window)
 
 void render_destroy_render(Render *render)
 {
+    SDL_DestroyRenderer(render->sdl_render);
     render->window->r = NULL;
     free(render);
     render_count--;
@@ -230,8 +234,6 @@ RenderResult render_get_window_size(const RenderWindow *window, int *w, int *h)
 
 RenderResult render_get_render_size(const Render *render, int *w, int *h)
 {
-    if (render == NULL || render->window == NULL)
-        return RENDER_FAILURE;
     render_get_window_size(render->window, w, h);
     return RENDER_SUCCESS;
 }
@@ -244,6 +246,7 @@ RenderResult render_draw_texture(
     RenderCoord *pivot,
     float angle)
 {
+    assert(texture->sdl_texture);
     SDL_Rect dest = convert_rect(dst_rect, render->pixel_scale);
 
     return SDL_RenderCopyEx(
@@ -383,10 +386,12 @@ RenderTexture *
 render_create_texture(const Render *render, const char *texture_path)
 {
     RenderTexture *t = alloc(RenderTexture);
+    assert(t);
 
     SDL_Surface *s = IMG_Load(texture_path);
 
     t->sdl_texture = SDL_CreateTextureFromSurface(render->sdl_render, s);
+    SDL_SetTextureScaleMode(t->sdl_texture, SDL_ScaleModeBest);
 
     SDL_FreeSurface(s);
     if (t->sdl_texture == NULL)
@@ -399,15 +404,36 @@ render_create_texture(const Render *render, const char *texture_path)
 }
 
 RenderTexture *
+render_create_texture_from_surface(const Render *render, SDL_Surface *surface)
+{
+    RenderTexture *t = alloc(RenderTexture);
+    assert(t);
+    t->sdl_texture = SDL_CreateTextureFromSurface(render->sdl_render, surface);
+    if (t->sdl_texture == NULL)
+    {
+        free(t);
+        printf("Error creating texture from surface\n");
+        return NULL;
+    }
+    return t;
+}
+
+RenderTexture *
 render_create_drawable_texture(const Render *render, int w, int h)
 {
     RenderTexture *t = alloc(RenderTexture);
-    t->sdl_texture   = SDL_CreateTexture(
+    assert(t);
+    t->sdl_texture = SDL_CreateTexture(
         render->sdl_render,
         SDL_PIXELFORMAT_RGBA8888,
         SDL_TEXTUREACCESS_TARGET,
         w,
         h);
+    if (t->sdl_texture == NULL)
+    {
+        free(t);
+        return NULL;
+    }
 
     return t;
 }
@@ -446,7 +472,8 @@ RenderFont *render_create_font(
     [[maybe_unused]] const Render *render, const char *font_path, uint8_t size)
 {
     RenderFont *f = alloc(RenderFont);
-    f->sdl_font   = TTF_OpenFont(font_path, size);
+    assert(f);
+    f->sdl_font = TTF_OpenFont(font_path, size);
     if (f->sdl_font == NULL)
     {
         free(f);
@@ -469,7 +496,8 @@ RenderText *render_create_text(
     uint8_t g,
     uint8_t b)
 {
-    RenderText *t    = alloc(RenderText);
+    RenderText *t = alloc(RenderText);
+    assert(t);
     SDL_Color colour = {r, g, b, 255};
 
     SDL_Surface *s = TTF_RenderText_Solid(font->sdl_font, text, colour);
@@ -487,6 +515,8 @@ RenderText *render_create_text(
         free(t);
         return NULL;
     }
+
+    SDL_FreeSurface(s);
 
     // find aspect ratio
     int w, h;
@@ -509,7 +539,7 @@ float render_text_get_aspect_ratio(const RenderText *text)
 
 RenderResult render_get_cursor_pos(const Render *render, int *x, int *y)
 {
-    if (!(render && (x || y)))
+    if (!((x || y)))
         return RENDER_FAILURE;
     if (x)
         *x = render->cursor_x;
@@ -535,8 +565,14 @@ RenderButton *render_create_button(
     const uint8_t padding)
 {
     RenderButton *button = alloc(RenderButton);
+    assert(button);
 
     RenderText *textObj = render_create_text(render, font, text, 255, 255, 255);
+    if (textObj == NULL)
+    {
+        free(button);
+        return NULL;
+    }
 
     *button = (RenderButton){
         .padding          = padding,
@@ -709,4 +745,9 @@ int input_get_next_key_code([[maybe_unused]] const Render *render)
     // return the next keycode types
 
     return 0;
+}
+
+SDL_Renderer *render_internal(const Render *render)
+{
+    return render->sdl_render;
 }

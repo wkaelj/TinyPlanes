@@ -1,7 +1,12 @@
 #include "chunk.h"
+#include "messenger.h"
 #include "perlin_noise.h"
 
+#include <assert.h>
 #include <cglm/vec2-ext.h>
+
+// use lower level sdl functions to improve drawing performance
+#include <SDL2/SDL.h>
 
 static vec3 colour_map[] = {
     {38,  33,  190},
@@ -71,8 +76,9 @@ populate_world_colours()
         }
     }
 
-    for (size_t i = 0; i < extra_end; i++)
+    for (size_t i = 1; i < extra_end; i++)
     {
+        assert(array_length(world_colours) == CHUNK_COLOUR_COUNT);
         world_colours[array_length(world_colours) - i] =
             vec3_to_colour(colour_map[array_length(colour_map) - 1]);
     }
@@ -95,39 +101,54 @@ void find_world_pos(ivec2 chunk_grid, ivec2 pixel_pos, vec2 out)
     vec2 chunk_center = {chunk_grid[0], -chunk_grid[1]};
     vec2 top_left;
     glm_vec2_add(
-        chunk_center, (vec2){CHUNK_SIZE / 2, -(CHUNK_SIZE / 2)}, top_left);
+        chunk_center, (vec2){-(CHUNK_SIZE / 2), -(CHUNK_SIZE / 2)}, top_left);
 
     out[0] =
-        top_left[0] + ((float)pixel_pos[0] / CHUNK_RESOLUTION * CHUNK_SIZE);
+        top_left[0] + ((float)pixel_pos[0] / (CHUNK_RESOLUTION * CHUNK_SIZE));
     out[1] =
-        top_left[1] + ((float)pixel_pos[1] / CHUNK_RESOLUTION * CHUNK_SIZE);
+        top_left[1] + ((float)pixel_pos[1] / (CHUNK_RESOLUTION * CHUNK_SIZE));
 }
 
-static void
-fill_chunk(const Render *r, RenderTexture *texture, ivec2 grid_coordinate)
+// NOTE: DO NOT TOUCH THE BITS
+static void fill_chunk(SDL_Surface **surface, ivec2 grid_coordinate)
 {
-    render_set_drawing_target(r, texture);
+    *surface = SDL_CreateRGBSurfaceWithFormat(
+        0, CHUNK_RESOLUTION, CHUNK_RESOLUTION, 32, SDL_PIXELFORMAT_RGBA8888);
+
+    if (*surface == NULL)
+    {
+        log_fatal("Cannot create chunks, SDL Error: %s", SDL_GetError());
+        assert(*surface);
+    }
 
     vec2 world_pos;
     RenderColour point_colour;
+
+    SDL_LockSurface(*surface);
+
+    u32 *pixels = (*surface)->pixels;
 
     // generate grid map
     for (size_t x = 0; x < CHUNK_RESOLUTION; x++)
     {
         for (size_t y = 0; y < CHUNK_RESOLUTION; y++)
         {
-
             // find world coordinate
             find_world_pos(grid_coordinate, (ivec2){x, y}, world_pos);
             // find colour of point
-            point_colour = generate_world_pixel(19284, world_pos);
+            point_colour = generate_world_pixel(2, world_pos);
             // draw colour to texture
-            render_set_colour(r, point_colour);
-            render_draw_point(r, x, y);
+            u32 colour = SDL_MapRGBA(
+                (*surface)->format,
+                point_colour.r,
+                point_colour.g,
+                point_colour.b,
+                point_colour.a);
+            assert((colour & 0xFF) == 255);
+            memcpy(pixels + x * (*surface)->w + y, &colour, sizeof(colour));
         }
     }
-
-    render_set_drawing_target(r, NULL);
+    SDL_UnlockSurface(*surface);
 }
 
 Chunk create_chunk(const Render *r, ivec2 grid_coordinate)
@@ -135,25 +156,28 @@ Chunk create_chunk(const Render *r, ivec2 grid_coordinate)
     Chunk c;
     glm_ivec2_copy(grid_coordinate, c.grid_coordinate);
 
-    c.texture =
-        render_create_drawable_texture(r, CHUNK_RESOLUTION, CHUNK_RESOLUTION);
+    SDL_Surface *surface;
+    fill_chunk(&surface, c.grid_coordinate);
+    c.texture = (RenderTexture *)SDL_CreateTextureFromSurface(
+        render_internal(r), surface);
 
-    fill_chunk(r, c.texture, c.grid_coordinate);
+    SDL_FreeSurface(surface);
 
     return c;
 }
 
-void destroy_chunk(Chunk *c) { render_destroy_texture(c->texture); }
-
-// recreate chunk with a new location
-// this moves the chunk and changes it's texture,
-// equivelant to destroying and creating a new chunk
-void move_chunk(const Render *r, Chunk *c, ivec2 new_coordinate)
+SDL_Surface *create_raw_chunk(ivec2 grid_coordinate)
 {
-    glm_ivec2_copy(new_coordinate, c->grid_coordinate);
-
-    fill_chunk(r, c->texture, c->grid_coordinate);
+    SDL_Surface *s;
+    fill_chunk(&s, grid_coordinate);
+    assert(s != NULL);
+    // FIX delete
+    SDL_LockSurface(s);
+    SDL_UnlockSurface(s);
+    return s;
 }
+
+void destroy_chunk(Chunk *c) { render_destroy_texture(c->texture); }
 
 static inline i32 signof(f64 x) { return (x > 0) - (x < 0); }
 
@@ -162,39 +186,4 @@ void chunk_containing(vec2 point, ivec2 dest)
 {
     dest[0] = (point[0] + signof(point[0]) * CHUNK_SIZE / 2) / CHUNK_SIZE;
     dest[1] = (point[1] + signof(point[1]) * CHUNK_SIZE / 2) / CHUNK_SIZE;
-}
-
-ChunkList create_chunk_list(const Render *r, f32 load_radius)
-{
-    ChunkList l = {
-        .chunk_count  = 1,
-        .chunks       = malloc(sizeof(Chunk)),
-        .player_chunk = {0, 0},
-        .load_radius  = load_radius,
-    };
-
-    l.chunks[0] = create_chunk(r, l.player_chunk);
-    return l;
-}
-
-void destroy_chunk_list(ChunkList *l)
-{
-    for (size_t i = 0; i < l->chunk_count; i++)
-        render_destroy_texture(l->chunks[i].texture);
-
-    free(l->chunks);
-}
-
-extern bool glm_ivec2_eqv(ivec2 a, ivec2 b);
-
-void update_chunk_list(const Render *r, ChunkList *l, vec2 player_pos)
-{
-    ivec2 player_chunk;
-    chunk_containing(player_pos, player_chunk);
-
-    if (glm_ivec2_eqv(player_chunk, l->player_chunk) == false)
-    {
-        move_chunk(r, l->chunks, player_chunk);
-        glm_ivec2_copy(player_chunk, l->player_chunk);
-    }
 }

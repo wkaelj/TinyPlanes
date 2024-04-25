@@ -12,7 +12,6 @@ typedef struct PlaneRender
 
     RenderTexture *plane_textures;
     RenderTexture *bullet_texture;
-    RenderTexture *terrain_texture;
     RenderTexture *ui_atlas;
     RenderTexture *main_menu_texture;
 
@@ -28,9 +27,6 @@ void destroy_plane_render(PlaneRender *render);
 NONULL(1, 2, 3)
 Result
 draw_plane(const PlaneRender *r, SimplePlane *client, SimplePlane *drawn);
-
-NONULL(1, 2)
-Result draw_terrain(const PlaneRender *r, SimplePlane *client);
 
 NONULL(1, 2)
 Result draw_chunk(const PlaneRender *r, SimplePlane *client, const Chunk *c);
