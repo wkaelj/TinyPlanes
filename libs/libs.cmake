@@ -15,10 +15,15 @@ add_library(${LIBS_WRAPPER_NAME} STATIC
 
 target_link_libraries(${LIBS_WRAPPER_NAME} PUBLIC
   noise1234
+  cutils
 )
 
 #include cglm headers
 target_include_directories(${LIBS_WRAPPER_NAME} PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/cglm/include/
+    ${CMAKE_CURRENT_LIST_DIR}/cutils/
+)
+include_directories(${LIBS_WRAPPER_NAME} PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/cglm/include/
     ${CMAKE_CURRENT_LIST_DIR}/cutils/
 )
