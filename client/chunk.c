@@ -110,23 +110,21 @@ void find_world_pos(ivec2 chunk_grid, ivec2 pixel_pos, vec2 out)
 }
 
 // NOTE: DO NOT TOUCH THE BITS
-static void fill_chunk(SDL_Surface **surface, ivec2 grid_coordinate)
+static SDL_Surface *fill_chunk(ivec2 grid_coordinate)
 {
-    *surface = SDL_CreateRGBSurfaceWithFormat(
+    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(
         0, CHUNK_RESOLUTION, CHUNK_RESOLUTION, 32, SDL_PIXELFORMAT_RGBA8888);
 
-    if (*surface == NULL)
+    if (surface == NULL)
     {
         log_fatal("Cannot create chunks, SDL Error: %s", SDL_GetError());
-        assert(*surface);
+        assert(surface);
     }
 
     vec2 world_pos;
     RenderColour point_colour;
 
-    SDL_LockSurface(*surface);
-
-    u32 *pixels = (*surface)->pixels;
+    SDL_LockSurface(surface);
 
     // generate grid map
     for (size_t x = 0; x < CHUNK_RESOLUTION; x++)
@@ -139,16 +137,22 @@ static void fill_chunk(SDL_Surface **surface, ivec2 grid_coordinate)
             point_colour = generate_world_pixel(2, world_pos);
             // draw colour to texture
             u32 colour = SDL_MapRGBA(
-                (*surface)->format,
+                surface->format,
                 point_colour.r,
                 point_colour.g,
                 point_colour.b,
                 point_colour.a);
             assert((colour & 0xFF) == 255);
-            memcpy(pixels + x * (*surface)->w + y, &colour, sizeof(colour));
+            memcpy(
+                (u8 *)surface->pixels + x * surface->pitch +
+                    y * surface->format->BytesPerPixel,
+                &colour,
+                sizeof(colour));
         }
     }
-    SDL_UnlockSurface(*surface);
+    SDL_UnlockSurface(surface);
+
+    return surface;
 }
 
 Chunk create_chunk(const Render *r, ivec2 grid_coordinate)
@@ -156,9 +160,8 @@ Chunk create_chunk(const Render *r, ivec2 grid_coordinate)
     Chunk c;
     glm_ivec2_copy(grid_coordinate, c.grid_coordinate);
 
-    SDL_Surface *surface;
-    fill_chunk(&surface, c.grid_coordinate);
-    c.texture = (RenderTexture *)SDL_CreateTextureFromSurface(
+    SDL_Surface *surface = fill_chunk(c.grid_coordinate);
+    c.texture            = (RenderTexture *)SDL_CreateTextureFromSurface(
         render_internal(r), surface);
 
     SDL_FreeSurface(surface);
@@ -168,12 +171,8 @@ Chunk create_chunk(const Render *r, ivec2 grid_coordinate)
 
 SDL_Surface *create_raw_chunk(ivec2 grid_coordinate)
 {
-    SDL_Surface *s;
-    fill_chunk(&s, grid_coordinate);
+    SDL_Surface *s = fill_chunk(grid_coordinate);
     assert(s != NULL);
-    // FIX delete
-    SDL_LockSurface(s);
-    SDL_UnlockSurface(s);
     return s;
 }
 

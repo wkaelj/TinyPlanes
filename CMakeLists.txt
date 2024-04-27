@@ -25,7 +25,6 @@ elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 
 add_compile_options(
   -fsanitize=address
-  -fanalyzer
   -fopenmp
 )
 add_link_options(
@@ -35,7 +34,7 @@ add_link_options(
 endif()
 
 set(CMAKE_MODULE_PATH client;shared;server;libs;)
-include(libs)
-include(shared)
-include(client)
-include(server)
+include(libs/libs.cmake)
+include(shared/shared.cmake)
+include(client/client.cmake)
+include(server/server.cmake)

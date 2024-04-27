@@ -13,7 +13,7 @@
 typedef enum Result
 {
     RS_SUCCESS = 0,
-    RS_FAILURE,
+    RS_FAILURE = 1,
 } Result;
 
 typedef int8_t i8;

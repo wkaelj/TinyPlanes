@@ -66,8 +66,13 @@ int game_update(GameData *game, f32 delta)
     update_chunk_list(game->render, &game->chunk_list, client_plane.position);
     for (size_t i = 0; i < CHUNK_COUNT; i++)
     {
-        draw_chunk(
-            &game->plane_render, &client_plane, &game->chunk_list.chunks[i]);
+        if (draw_chunk(
+                &game->plane_render,
+                &client_plane,
+                &game->chunk_list.chunks[i]))
+        {
+            log_warning("Error drawing chunk");
+        }
     }
 
     // draw planes
@@ -115,6 +120,7 @@ Result game_loop()
     GameData game = {0};
     if (init_game(&game) != RS_SUCCESS)
         return RS_FAILURE;
+
     bool running = true;
     input_init(game.render);
 

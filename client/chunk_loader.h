@@ -18,7 +18,7 @@ static_assert(CHUNK_COUNT == 9);
 
 typedef struct ChunkList
 {
-    Chunk chunks[CHUNK_COUNT];
+    Chunk *chunks;
     SDL_mutex *sync_mutex;
     ivec2 player_chunk;
 } ChunkList;

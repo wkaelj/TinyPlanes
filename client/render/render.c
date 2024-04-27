@@ -412,7 +412,7 @@ render_create_texture_from_surface(const Render *render, SDL_Surface *surface)
     if (t->sdl_texture == NULL)
     {
         free(t);
-        printf("Error creating texture from surface\n");
+        printf("Error creating texture from surface %s\n", SDL_GetError());
         return NULL;
     }
     return t;

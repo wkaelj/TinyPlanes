@@ -39,29 +39,21 @@ void create_chunks(RawChunk *raws, ivec2 center)
     i32 y_start = center[1] - CHUNK_RADIUS;
     i32 size    = CHUNK_RADIUS * 2 + 1; // width and height to gen
     size_t i    = 0;
-    log_debug("Generating chunks start (%d, %d)", x_start, y_start);
-    SDL_mutex *raws_mutex = SDL_CreateMutex();
-#pragma omp parallel for
     for (i32 x = x_start; x < x_start + size; x++)
     {
         for (i32 y = y_start; y < y_start + size; y++)
         {
-            printf("Creating chunk (%d, %d)   \r", x, y);
-            fflush(stdout);
             assert(i < CHUNK_COUNT);
-            SDL_LockMutex(raws_mutex);
             raws[i].surface = create_raw_chunk((ivec2){x, y});
             glm_ivec2_copy((ivec2){x, y}, raws[i].grid_coordinate);
-            SDL_UnlockMutex(raws_mutex);
-            i++;
+            ++i;
         }
     }
-    SDL_DestroyMutex(raws_mutex);
-    puts("");
 }
 
 static int thread_main(void *arg)
 {
+    log_debug("Creating new chunk");
     ThreadInfo *info = arg;
     vec2 player_pos;
     glm_vec2_copy(info->player_pos, player_pos);
@@ -78,7 +70,7 @@ static int thread_main(void *arg)
 
     // update chunks
     RawChunk raws[CHUNK_COUNT];
-    create_chunks(raws, current_chunk);
+    create_chunks(raws, GLM_IVEC2_ZERO);
 
     // write chunk surfaces
     SDL_LockMutex(chunks_mutex);
@@ -87,9 +79,14 @@ static int thread_main(void *arg)
         render_destroy_texture(chunks[i].texture);
         chunks[i].texture =
             render_create_texture_from_surface(r, raws[i].surface);
-        if (i == 0)
+        if (chunks[i].texture == NULL)
         {
-            IMG_SaveJPG(raws[i].surface, "test.jpeg", 66);
+            log_fatal(
+                "Failed to create chunk %lu %s\n \t(%d, %d)",
+                i,
+                SDL_GetError(),
+                chunks[i].grid_coordinate[0],
+                chunks[i].grid_coordinate[1]);
         }
         assert(chunks[i].texture);
         glm_ivec2_copy(raws[i].grid_coordinate, chunks[i].grid_coordinate);
@@ -105,7 +102,9 @@ ChunkList create_chunk_list(const Render *r)
     ChunkList l = {
         .sync_mutex   = SDL_CreateMutex(),
         .player_chunk = GLM_IVEC2_ZERO_INIT,
+        .chunks       = malloc(sizeof(Chunk) * CHUNK_COUNT),
     };
+    assert(l.chunks);
 
     // create initial chunks
     RawChunk raws[CHUNK_COUNT];
@@ -129,6 +128,14 @@ ChunkList create_chunk_list(const Render *r)
         SDL_FreeSurface(raws[i].surface);
     }
     SDL_UnlockMutex(l.sync_mutex);
+    ThreadInfo *thread_info = malloc(sizeof(ThreadInfo));
+    assert(thread_info);
+    thread_info->chunk_list = l.chunks;
+    thread_info->sync_mutex = l.sync_mutex;
+    thread_info->render     = r;
+    glm_vec2_copy(GLM_VEC2_ZERO, thread_info->player_pos);
+    SDL_Thread *t = SDL_CreateThread(thread_main, "wg", thread_info);
+    SDL_WaitThread(t, NULL);
 
     return l;
 }
@@ -136,7 +143,9 @@ void destroy_chunk_list(ChunkList *l)
 {
     for (size_t i = 0; i < CHUNK_COUNT; i++)
         destroy_chunk(&l->chunks[i]);
+    SDL_LockMutex(l->sync_mutex);
     SDL_DestroyMutex(l->sync_mutex);
+    free(l->chunks);
 }
 
 void update_chunk_list(const Render *r, ChunkList *l, vec2 player_pos)
@@ -149,11 +158,6 @@ void update_chunk_list(const Render *r, ChunkList *l, vec2 player_pos)
         return;
 
     glm_ivec2_copy(current_chunk, l->player_chunk);
-
-    log_info(
-        "Generating new chunk set (%d, %d)",
-        current_chunk[0],
-        current_chunk[1]);
 
     ThreadInfo *thread_info = malloc(sizeof(ThreadInfo));
     assert(thread_info);
