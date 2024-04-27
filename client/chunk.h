@@ -4,7 +4,7 @@
 #include <SDL2/SDL.h>
 #include <types.h>
 
-#define CHUNK_RESOLUTION (128)
+#define CHUNK_RESOLUTION (64)
 #define CHUNK_SIZE (0.5)
 
 #define CHUNK_COLOUR_COUNT (512)

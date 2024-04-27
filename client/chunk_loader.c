@@ -70,7 +70,7 @@ static int thread_main(void *arg)
 
     // update chunks
     RawChunk raws[CHUNK_COUNT];
-    create_chunks(raws, GLM_IVEC2_ZERO);
+    create_chunks(raws, current_chunk);
 
     // write chunk surfaces
     SDL_LockMutex(chunks_mutex);
@@ -88,6 +88,11 @@ static int thread_main(void *arg)
                 chunks[i].grid_coordinate[0],
                 chunks[i].grid_coordinate[1]);
         }
+        render_set_drawing_target(r, chunks[i].texture);
+        RenderRect rect = {0, 0, 1, 1};
+        render_set_colour(r, (RenderColour){255, 0, 0, 255});
+        render_draw_rect(r, &rect);
+        render_set_drawing_target(r, NULL);
         assert(chunks[i].texture);
         glm_ivec2_copy(raws[i].grid_coordinate, chunks[i].grid_coordinate);
         SDL_FreeSurface(raws[i].surface);
@@ -128,15 +133,6 @@ ChunkList create_chunk_list(const Render *r)
         SDL_FreeSurface(raws[i].surface);
     }
     SDL_UnlockMutex(l.sync_mutex);
-    ThreadInfo *thread_info = malloc(sizeof(ThreadInfo));
-    assert(thread_info);
-    thread_info->chunk_list = l.chunks;
-    thread_info->sync_mutex = l.sync_mutex;
-    thread_info->render     = r;
-    glm_vec2_copy(GLM_VEC2_ZERO, thread_info->player_pos);
-    SDL_Thread *t = SDL_CreateThread(thread_main, "wg", thread_info);
-    SDL_WaitThread(t, NULL);
-
     return l;
 }
 void destroy_chunk_list(ChunkList *l)
