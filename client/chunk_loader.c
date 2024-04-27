@@ -88,11 +88,6 @@ static int thread_main(void *arg)
                 chunks[i].grid_coordinate[0],
                 chunks[i].grid_coordinate[1]);
         }
-        render_set_drawing_target(r, chunks[i].texture);
-        RenderRect rect = {0, 0, 1, 1};
-        render_set_colour(r, (RenderColour){255, 0, 0, 255});
-        render_draw_rect(r, &rect);
-        render_set_drawing_target(r, NULL);
         assert(chunks[i].texture);
         glm_ivec2_copy(raws[i].grid_coordinate, chunks[i].grid_coordinate);
         SDL_FreeSurface(raws[i].surface);
